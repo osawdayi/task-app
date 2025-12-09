@@ -24,6 +24,14 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Validate required environment variables at runtime
+    if (!STRIPE_SECRET_KEY) {
+      throw new Error("STRIPE_SECRET_KEY is not set. Please configure it in Supabase secrets.");
+    }
+    if (!STRIPE_PRICE_ID) {
+      throw new Error("STRIPE_PRICE_ID is not set. Please configure it in Supabase secrets using: supabase secrets set STRIPE_PRICE_ID=price_xxx");
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
         autoRefreshToken: false,
@@ -102,12 +110,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create Checkout session for new subscribers
+    // Create Checkout session for new subscribers (free plan users)
+    console.log(`💳 Creating checkout session for customer ${customerId} with price ${STRIPE_PRICE_ID}`);
+    
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
         {
-          price: STRIPE_PRICE_ID,
+          price: STRIPE_PRICE_ID!,
           quantity: 1,
         },
       ],
@@ -115,6 +125,8 @@ Deno.serve(async (req) => {
       success_url: `${originUrl}/profile?success=true`,
       cancel_url: `${originUrl}/profile?canceled=true`,
     });
+
+    console.log(`✅ Created checkout session: ${session.url}`);
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
