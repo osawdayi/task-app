@@ -49,24 +49,67 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchLastModified();
+
+    // Subscribe to real-time updates for the profile
+    const setupSubscription = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) return null;
+
+      const channel = supabase
+        .channel(`profile-changes-${session.user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "profiles",
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          (payload) => {
+            const newTimestamp = payload.new.dashboard_last_modified;
+            if (newTimestamp) {
+              setLastModified(newTimestamp);
+            }
+          }
+        )
+        .subscribe();
+
+      return channel;
+    };
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    setupSubscription().then((ch) => {
+      channel = ch;
+    });
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   const handleCreateTask = async (title: string, description: string) => {
     await createTask(title, description);
     await refreshTasks();
-    await fetchLastModified();
+    // Fallback: fetch after a short delay in case real-time doesn't work
+    setTimeout(() => fetchLastModified(), 500);
     console.log(`New Task Created: ${title}`);
     setIsDialogOpen(false);
   };
 
   const handleDeleteTask = async (taskId: string) => {
     await deleteTask(taskId);
-    await fetchLastModified();
+    // Fallback: fetch after a short delay in case real-time doesn't work
+    setTimeout(() => fetchLastModified(), 500);
   };
 
   const handleToggleComplete = async (taskId: string, completed: boolean) => {
     await toggleTaskComplete(taskId, completed);
-    await fetchLastModified();
+    // Fallback: fetch after a short delay in case real-time doesn't work
+    setTimeout(() => fetchLastModified(), 500);
   };
 
   const formatDateTime = (dateString: string | null) => {

@@ -33,25 +33,27 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
   );
 
   // Helper function to update dashboard_last_modified
-  const updateDashboardLastModified = async () => {
+  const updateDashboardLastModified = async (): Promise<string | null> => {
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      if (!session?.user) return null;
 
+      const timestamp = new Date().toISOString();
       const { error } = await supabase
         .from("profiles")
-        .update({ dashboard_last_modified: new Date().toISOString() })
+        .update({ dashboard_last_modified: timestamp })
         .eq("user_id", session.user.id);
 
       if (error) {
         console.error("Error updating dashboard_last_modified:", error);
-        // Don't throw - this is not critical
+        return null;
       }
+      return timestamp;
     } catch (error) {
       console.error("Error updating dashboard_last_modified:", error);
-      // Don't throw - this is not critical
+      return null;
     }
   };
 
