@@ -296,3 +296,9 @@ entrypoint = "./functions/createStripeSession/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/createStripeSession/*.html" ]
+
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+# Note: JWT verification is disabled because Stripe webhooks don't include JWT tokens
+# They use Stripe signature verification instead (handled in the function code)
