@@ -12,6 +12,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
+          dashboard_last_modified: string | null
           name: string | null
           stripe_customer_id: string | null
           subscription_plan: string | null
@@ -21,6 +22,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          dashboard_last_modified?: string | null
           name?: string | null
           stripe_customer_id?: string | null
           subscription_plan?: string | null
@@ -30,6 +32,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          dashboard_last_modified?: string | null
           name?: string | null
           stripe_customer_id?: string | null
           subscription_plan?: string | null

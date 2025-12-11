@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTaskManager } from "@/hooks/useTaskManager";
 import { Button } from "@/components/ui/button";
 import TaskList from "@/components/TaskList";
 import { CreateTaskForm } from "@/components/CreateTaskForm";
 import { PlusCircle, ClipboardList } from "lucide-react";
+import { createBrowserClient } from '@supabase/ssr';
 import {
   Dialog,
   DialogContent,
@@ -17,20 +18,78 @@ import {
 
 export default function Dashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [lastModified, setLastModified] = useState<string | null>(null);
   const { createTask, refreshTasks, tasks, deleteTask, toggleTaskComplete } =
     useTaskManager();
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const fetchLastModified = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("dashboard_last_modified")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (error) throw error;
+      setLastModified(data?.dashboard_last_modified || null);
+    } catch (error) {
+      console.error("Error fetching last modified:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchLastModified();
+  }, []);
 
   const handleCreateTask = async (title: string, description: string) => {
     await createTask(title, description);
     await refreshTasks();
+    await fetchLastModified();
     console.log(`New Task Created: ${title}`);
     setIsDialogOpen(false);
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    await deleteTask(taskId);
+    await fetchLastModified();
+  };
+
+  const handleToggleComplete = async (taskId: string, completed: boolean) => {
+    await toggleTaskComplete(taskId, completed);
+    await fetchLastModified();
+  };
+
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return "Never";
+    const date = new Date(dateString);
+    return date.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Your Tasks</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Your Tasks</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Last modified: {formatDateTime(lastModified)}
+          </p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -53,8 +112,8 @@ export default function Dashboard() {
         <div className="border rounded-md">
           <TaskList
             tasks={tasks}
-            onDelete={deleteTask}
-            onToggleComplete={toggleTaskComplete}
+            onDelete={handleDeleteTask}
+            onToggleComplete={handleToggleComplete}
           />
         </div>
       ) : (

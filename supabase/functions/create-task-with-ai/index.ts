@@ -91,6 +91,17 @@ Deno.serve(async (req) => {
 
     if (updateError) throw updateError;
 
+    // Update dashboard_last_modified in profile
+    const { error: profileUpdateError } = await supabaseClient
+      .from("profiles")
+      .update({ dashboard_last_modified: new Date().toISOString() })
+      .eq("user_id", user.id);
+
+    if (profileUpdateError) {
+      console.error("Error updating dashboard_last_modified:", profileUpdateError);
+      // Don't throw - this is not critical
+    }
+
     return new Response(JSON.stringify(updatedTask), {
       headers: {
         "Content-Type": "application/json",

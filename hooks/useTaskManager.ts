@@ -32,6 +32,29 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  // Helper function to update dashboard_last_modified
+  const updateDashboardLastModified = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ dashboard_last_modified: new Date().toISOString() })
+        .eq("user_id", session.user.id);
+
+      if (error) {
+        console.error("Error updating dashboard_last_modified:", error);
+        // Don't throw - this is not critical
+      }
+    } catch (error) {
+      console.error("Error updating dashboard_last_modified:", error);
+      // Don't throw - this is not critical
+    }
+  };
+
   // Fetch single task
   useEffect(() => {
     if (!taskId) return;
@@ -84,6 +107,7 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
         .eq("task_id", taskData.task_id);
 
       if (error) throw error;
+      await updateDashboardLastModified();
     } catch (error: any) {
       console.error("Error saving task:", error);
       setError(error.message);
@@ -211,6 +235,7 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
 
       if (error) throw error;
       setTasks(tasks.filter((t) => t.task_id !== taskIdToDelete));
+      await updateDashboardLastModified();
       setError(null);
     } catch (error: any) {
       console.error("Error deleting task:", error);
@@ -235,6 +260,7 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
           t.task_id === taskIdToToggle ? { ...t, completed } : t
         )
       );
+      await updateDashboardLastModified();
       setError(null);
     } catch (error: any) {
       console.error("Error updating task:", error);
