@@ -69,22 +69,32 @@ export default function Dashboard() {
   }, [fetchLastModified]);
 
   const handleCreateTask = async (title: string, description: string) => {
-    await createTask(title, description);
+    // Pass empty string if description is not provided
+    const taskDescription = description?.trim() || "";
+    await createTask(title, taskDescription);
     await refreshTasks();
     console.log(`New Task Created: ${title}`);
     setIsDialogOpen(false);
-    // Refresh last modified timestamp
-    await fetchLastModified();
+    // Wait a bit for database trigger to update, then refresh timestamp
+    setTimeout(() => {
+      fetchLastModified();
+    }, 500);
   };
 
   const handleDeleteTask = async (taskId: string) => {
     await deleteTask(taskId);
-    await fetchLastModified();
+    // Wait a bit for database trigger to update, then refresh timestamp
+    setTimeout(() => {
+      fetchLastModified();
+    }, 500);
   };
 
   const handleToggleComplete = async (taskId: string, completed: boolean) => {
     await toggleTaskComplete(taskId, completed);
-    await fetchLastModified();
+    // Wait a bit for database trigger to update, then refresh timestamp
+    setTimeout(() => {
+      fetchLastModified();
+    }, 500);
   };
 
   return (

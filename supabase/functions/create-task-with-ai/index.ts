@@ -24,6 +24,10 @@ Deno.serve(async (req) => {
     const { title, description } = await req.json();
 
     console.log("🔄 Creating task with AI suggestions...");
+    console.log("📋 Received title:", title);
+    console.log("📋 Received description:", description);
+    console.log("🔑 OPENAI_API_KEY present:", !!OPENAI_API_KEY);
+    
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("No authorization header");
@@ -49,19 +53,39 @@ Deno.serve(async (req) => {
 
     // Auto-generate description if not provided
     let finalDescription = description;
-    if (!description || description.trim() === "") {
-      console.log("📝 Auto-generating description for task...");
-      const descriptionPrompt = `Create a concise one-sentence description for this task: "${title}". The description should be helpful and specific. Reply with only the description sentence, nothing else.`;
+    const hasDescription = description && typeof description === "string" && description.trim().length > 0;
+    
+    if (!hasDescription) {
+      if (!OPENAI_API_KEY) {
+        console.warn("⚠️ OPENAI_API_KEY not set, skipping description generation");
+        finalDescription = null;
+      } else {
+        try {
+          console.log("📝 Auto-generating description for task...");
+          const descriptionPrompt = `Create a concise one-sentence description for this task: "${title}". The description should be helpful and specific. Reply with only the description sentence, nothing else.`;
 
-      const descriptionCompletion = await openai.chat.completions.create({
-        messages: [{ role: "user", content: descriptionPrompt }],
-        model: "gpt-4o-mini",
-        temperature: 0.5,
-        max_tokens: 100,
-      });
+          const descriptionCompletion = await openai.chat.completions.create({
+            messages: [{ role: "user", content: descriptionPrompt }],
+            model: "gpt-4o-mini",
+            temperature: 0.5,
+            max_tokens: 100,
+          });
 
-      finalDescription = descriptionCompletion.choices[0].message.content?.trim() || "";
-      console.log(`✨ AI Generated Description: ${finalDescription}`);
+          finalDescription = descriptionCompletion.choices[0].message.content?.trim() || null;
+          if (finalDescription) {
+            console.log(`✨ AI Generated Description: ${finalDescription}`);
+          } else {
+            console.warn("⚠️ OpenAI returned empty description");
+          }
+        } catch (error: any) {
+          console.error("❌ Error generating description:", error.message);
+          console.error("❌ Full error:", error);
+          // Continue without description if AI fails
+          finalDescription = null;
+        }
+      }
+    } else {
+      console.log("✅ Using provided description:", finalDescription);
     }
 
     // Create the task
@@ -107,6 +131,12 @@ Deno.serve(async (req) => {
       .single();
 
     if (updateError) throw updateError;
+
+    // Update dashboard_last_modified timestamp (trigger should handle this, but doing it explicitly for safety)
+    await supabaseClient
+      .from("profiles")
+      .update({ dashboard_last_modified: new Date().toISOString() })
+      .eq("user_id", user.id);
 
     return new Response(JSON.stringify(updatedTask), {
       headers: {
