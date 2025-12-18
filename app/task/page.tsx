@@ -261,14 +261,14 @@ function TaskForm() {
             {task.image_url ? renderImageDisplay() : renderImageUpload()}
           </div>
         </div>
-        {task.last_modified && (
-          <div className="grid w-full items-center gap-1.5">
-            <Label>Last Modified</Label>
-            <div className="text-sm text-muted-foreground">
-              {format(new Date(task.last_modified), "PPpp")}
-            </div>
+        <div className="grid w-full items-center gap-1.5">
+          <Label>Last Modified</Label>
+          <div className="text-sm text-muted-foreground">
+            {task.last_modified 
+              ? format(new Date(task.last_modified), "PPpp")
+              : "Not available"}
           </div>
-        )}
+        </div>
         <div className="flex space-x-2 w-full pt-4">
           <Link href="/dashboard" className="flex-1">
             <Button type="button" variant="outline" className="w-full">
