@@ -69,9 +69,9 @@ export default function Dashboard() {
   }, [fetchLastModified]);
 
   const handleCreateTask = async (title: string, description: string) => {
-    // Pass empty string if description is not provided
-    const taskDescription = description?.trim() || "";
-    await createTask(title, taskDescription);
+    // Pass null if description is empty, so edge function knows to generate one
+    const taskDescription = description?.trim() || null;
+    await createTask(title, taskDescription || "");
     await refreshTasks();
     console.log(`New Task Created: ${title}`);
     setIsDialogOpen(false);

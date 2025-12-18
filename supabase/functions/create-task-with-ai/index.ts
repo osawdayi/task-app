@@ -52,18 +52,33 @@ Deno.serve(async (req) => {
     });
 
     // Auto-generate description if not provided
-    let finalDescription = description;
-    const hasDescription = description && typeof description === "string" && description.trim().length > 0;
+    // Normalize description: convert empty strings, null, undefined to null
+    const normalizedDescription = description && typeof description === "string" && description.trim().length > 0
+      ? description.trim()
+      : null;
     
-    if (!hasDescription) {
+    // Check if we need to generate a description
+    const needsDescription = normalizedDescription === null;
+    
+    console.log("🔍 Description check:", {
+      originalDescription: description,
+      normalizedDescription,
+      needsDescription,
+      hasOpenAIKey: !!OPENAI_API_KEY
+    });
+    
+    let finalDescription = normalizedDescription;
+    
+    if (needsDescription) {
       if (!OPENAI_API_KEY) {
         console.warn("⚠️ OPENAI_API_KEY not set, skipping description generation");
         finalDescription = null;
       } else {
         try {
-          console.log("📝 Auto-generating description for task...");
+          console.log("📝 Auto-generating description for task:", title);
           const descriptionPrompt = `Create a concise one-sentence description for this task: "${title}". The description should be helpful and specific. Reply with only the description sentence, nothing else.`;
 
+          console.log("🤖 Calling OpenAI for description generation...");
           const descriptionCompletion = await openai.chat.completions.create({
             messages: [{ role: "user", content: descriptionPrompt }],
             model: "gpt-4o-mini",
@@ -71,15 +86,19 @@ Deno.serve(async (req) => {
             max_tokens: 100,
           });
 
-          finalDescription = descriptionCompletion.choices[0].message.content?.trim() || null;
+          const rawDescription = descriptionCompletion.choices[0].message.content;
+          console.log("📥 Raw OpenAI response:", rawDescription);
+          
+          finalDescription = rawDescription?.trim() || null;
           if (finalDescription) {
             console.log(`✨ AI Generated Description: ${finalDescription}`);
           } else {
-            console.warn("⚠️ OpenAI returned empty description");
+            console.warn("⚠️ OpenAI returned empty or null description");
           }
         } catch (error: any) {
           console.error("❌ Error generating description:", error.message);
-          console.error("❌ Full error:", error);
+          console.error("❌ Error stack:", error.stack);
+          console.error("❌ Full error object:", JSON.stringify(error, null, 2));
           // Continue without description if AI fails
           finalDescription = null;
         }
@@ -87,6 +106,8 @@ Deno.serve(async (req) => {
     } else {
       console.log("✅ Using provided description:", finalDescription);
     }
+    
+    console.log("📝 Final description to use:", finalDescription);
 
     // Create the task
     const { data, error } = await supabaseClient
@@ -103,7 +124,8 @@ Deno.serve(async (req) => {
     if (error) throw error;
 
     // Get label suggestion from OpenAI
-    const prompt = `Based on this task title: "${title}" and description: "${finalDescription}", suggest ONE of these labels: work, personal, priority, shopping, home. Reply with just the label word and nothing else.`;
+    const descriptionText = finalDescription || "no description provided";
+    const prompt = `Based on this task title: "${title}" and description: "${descriptionText}", suggest ONE of these labels: work, personal, priority, shopping, home. Reply with just the label word and nothing else.`;
 
     const completion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
