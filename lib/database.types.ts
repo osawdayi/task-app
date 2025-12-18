@@ -47,6 +47,7 @@ export type Database = {
           due_date: string | null
           image_url: string | null
           label: string | null
+          last_modified: string | null
           rank: number | null
           task_id: string
           title: string
@@ -60,6 +61,7 @@ export type Database = {
           due_date?: string | null
           image_url?: string | null
           label?: string | null
+          last_modified?: string | null
           rank?: number | null
           task_id?: string
           title: string
@@ -73,6 +75,7 @@ export type Database = {
           due_date?: string | null
           image_url?: string | null
           label?: string | null
+          last_modified?: string | null
           rank?: number | null
           task_id?: string
           title?: string

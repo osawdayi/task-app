@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Edit, Trash2 } from "lucide-react";
 import { getLabelColors } from "@/lib/labels";
 import { Task } from "@/types/models";
+import { format } from "date-fns";
 
 interface TaskRowProps {
   task: Task;
@@ -16,6 +17,15 @@ interface TaskRowProps {
 const TaskRow = ({ task, onDelete, onToggleComplete }: TaskRowProps) => {
   const formatDate = (dateString: string) => {
     return dateString.split("T")[0];
+  };
+
+  const formatLastModified = (dateString: string | null) => {
+    if (!dateString) return "";
+    try {
+      return format(new Date(dateString), "MMM d, yyyy h:mm a");
+    } catch {
+      return "";
+    }
   };
 
   return (
@@ -52,6 +62,9 @@ const TaskRow = ({ task, onDelete, onToggleComplete }: TaskRowProps) => {
       </TableCell>
       <TableCell className="py-2 whitespace-nowrap">
         {task.due_date ? formatDate(task.due_date) : ""}
+      </TableCell>
+      <TableCell className="py-2 whitespace-nowrap text-sm text-muted-foreground">
+        {formatLastModified(task.last_modified)}
       </TableCell>
       <TableCell className="text-right py-2">
         <Button variant="ghost" size="icon" asChild className="h-8 w-8">
