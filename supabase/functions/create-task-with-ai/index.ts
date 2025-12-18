@@ -42,12 +42,34 @@ Deno.serve(async (req) => {
     } = await supabaseClient.auth.getUser();
     if (!user) throw new Error("No user found");
 
+    // Initialize OpenAI
+    const openai = new OpenAI({
+      apiKey: OPENAI_API_KEY,
+    });
+
+    // Auto-generate description if not provided
+    let finalDescription = description;
+    if (!description || description.trim() === "") {
+      console.log("📝 Auto-generating description for task...");
+      const descriptionPrompt = `Create a concise one-sentence description for this task: "${title}". The description should be helpful and specific. Reply with only the description sentence, nothing else.`;
+
+      const descriptionCompletion = await openai.chat.completions.create({
+        messages: [{ role: "user", content: descriptionPrompt }],
+        model: "gpt-4o-mini",
+        temperature: 0.5,
+        max_tokens: 100,
+      });
+
+      finalDescription = descriptionCompletion.choices[0].message.content?.trim() || "";
+      console.log(`✨ AI Generated Description: ${finalDescription}`);
+    }
+
     // Create the task
     const { data, error } = await supabaseClient
       .from("tasks")
       .insert({
         title,
-        description,
+        description: finalDescription,
         completed: false,
         user_id: user.id,
       })
@@ -56,13 +78,8 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
-    // Initialize OpenAI
-    const openai = new OpenAI({
-      apiKey: OPENAI_API_KEY,
-    });
-
     // Get label suggestion from OpenAI
-    const prompt = `Based on this task title: "${title}" and description: "${description}", suggest ONE of these labels: work, personal, priority, shopping, home. Reply with just the label word and nothing else.`;
+    const prompt = `Based on this task title: "${title}" and description: "${finalDescription}", suggest ONE of these labels: work, personal, priority, shopping, home. Reply with just the label word and nothing else.`;
 
     const completion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt }],

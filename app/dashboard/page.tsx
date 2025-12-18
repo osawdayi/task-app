@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTaskManager } from "@/hooks/useTaskManager";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import TaskList from "@/components/TaskList";
 import { CreateTaskForm } from "@/components/CreateTaskForm";
@@ -14,23 +15,89 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { createBrowserClient } from "@supabase/ssr";
+import { format } from "date-fns";
 
 export default function Dashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [lastModified, setLastModified] = useState<Date | null>(null);
   const { createTask, refreshTasks, tasks, deleteTask, toggleTaskComplete } =
     useTaskManager();
+  const { session } = useAuth();
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  // Fetch dashboard last modified timestamp
+  const fetchLastModified = useCallback(async () => {
+    if (!session?.user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("dashboard_last_modified")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (error) throw error;
+      if (data?.dashboard_last_modified) {
+        setLastModified(new Date(data.dashboard_last_modified));
+      }
+    } catch (error: any) {
+      console.error("Error fetching dashboard last modified:", error);
+    }
+  }, [session, supabase]);
+
+  useEffect(() => {
+    fetchLastModified();
+  }, [fetchLastModified, tasks]);
+
+  // Refresh timestamp when page becomes visible (e.g., when navigating back)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchLastModified();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchLastModified]);
 
   const handleCreateTask = async (title: string, description: string) => {
     await createTask(title, description);
     await refreshTasks();
     console.log(`New Task Created: ${title}`);
     setIsDialogOpen(false);
+    // Refresh last modified timestamp
+    await fetchLastModified();
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    await deleteTask(taskId);
+    await fetchLastModified();
+  };
+
+  const handleToggleComplete = async (taskId: string, completed: boolean) => {
+    await toggleTaskComplete(taskId, completed);
+    await fetchLastModified();
   };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Your Tasks</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Your Tasks</h1>
+          {lastModified && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Last modified: {format(lastModified, "PPpp")}
+            </p>
+          )}
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -53,8 +120,8 @@ export default function Dashboard() {
         <div className="border rounded-md">
           <TaskList
             tasks={tasks}
-            onDelete={deleteTask}
-            onToggleComplete={toggleTaskComplete}
+            onDelete={handleDeleteTask}
+            onToggleComplete={handleToggleComplete}
           />
         </div>
       ) : (

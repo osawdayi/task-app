@@ -84,6 +84,9 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
         .eq("task_id", taskData.task_id);
 
       if (error) throw error;
+      
+      // Update dashboard last modified timestamp
+      await updateDashboardLastModified();
     } catch (error: any) {
       console.error("Error saving task:", error);
       setError(error.message);
@@ -145,6 +148,28 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
     }
   };
 
+  // Helper function to update dashboard_last_modified timestamp
+  const updateDashboardLastModified = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) return;
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ dashboard_last_modified: new Date().toISOString() })
+        .eq("user_id", session.user.id);
+
+      if (error) {
+        console.error("Error updating dashboard_last_modified:", error);
+      }
+    } catch (error: any) {
+      console.error("Error updating dashboard_last_modified:", error);
+    }
+  };
+
   // Task list operations
   const fetchTasks = async () => {
     try {
@@ -194,6 +219,10 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
 
       setTasks([taskData, ...tasks]);
       setError(null);
+      
+      // Update dashboard last modified timestamp
+      await updateDashboardLastModified();
+      
       return taskData;
     } catch (error: any) {
       console.error("Error creating task:", error);
@@ -212,6 +241,9 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
       if (error) throw error;
       setTasks(tasks.filter((t) => t.task_id !== taskIdToDelete));
       setError(null);
+      
+      // Update dashboard last modified timestamp
+      await updateDashboardLastModified();
     } catch (error: any) {
       console.error("Error deleting task:", error);
       setError(error.message);
@@ -236,6 +268,9 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
         )
       );
       setError(null);
+      
+      // Update dashboard last modified timestamp
+      await updateDashboardLastModified();
     } catch (error: any) {
       console.error("Error updating task:", error);
       setError(error.message);
